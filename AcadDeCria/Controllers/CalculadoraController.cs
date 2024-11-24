@@ -17,7 +17,6 @@ namespace AcadDeCria.Controllers
             _context = context;
         }
 
-        // POST api/calculator
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Calculator calculator)
         {
@@ -26,17 +25,14 @@ namespace AcadDeCria.Controllers
                 return BadRequest("Dados inválidos.");
             }
 
-            // Garantir que a data esteja em UTC
             calculator.EnsureUtcDate();
 
-            // Adiciona o novo cálculo à tabela
             _context.calculators.Add(calculator);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = calculator.id }, calculator);
         }
 
-        // GET api/calculator/{userId}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -50,23 +46,65 @@ namespace AcadDeCria.Controllers
             return Ok(calculator);
         }
 
-        // GET api/calculator/{userid}
         [HttpGet("user/{userid}")]
         public async Task<IActionResult> GetByUserId(int userid)
         {
-            // Busca o cálculo com base no userid
-            var calculator = await _context.calculators
-                                            .Where(c => c.userid == userid)
-                                            .ToListAsync();
+            var calculators = await _context.calculators
+                                             .Where(c => c.userid == userid)
+                                             .ToListAsync();
 
-            if (calculator == null)
+            if (calculators == null || !calculators.Any())
             {
                 return NotFound();
             }
 
-            return Ok(calculator);
+            calculators = RadixSort(calculators);
+
+            return Ok(calculators);
         }
 
+        private List<Calculator> RadixSort(List<Calculator> calculators)
+        {
+            float maxValue = calculators.Max(c => c.resultado ?? 0);
+
+            int exp = 1;
+
+            while (maxValue / exp > 0)
+            {
+                calculators = CountingSortByDigit(calculators, exp);
+                exp *= 10;
+            }
+
+            return calculators;
+        }
+
+        private List<Calculator> CountingSortByDigit(List<Calculator> calculators, int exp)
+        {
+            int n = calculators.Count;
+
+            var output = new Calculator[n];
+            int[] count = new int[10];
+
+            foreach (var calculator in calculators)
+            {
+                int digit = (int)((calculator.resultado ?? 0) / exp) % 10;
+                count[digit]++;
+            }
+
+            for (int i = 1; i < 10; i++)
+            {
+                count[i] += count[i - 1];
+            }
+
+            for (int i = n - 1; i >= 0; i--)
+            {
+                int digit = (int)((calculators[i].resultado ?? 0) / exp) % 10;
+                output[count[digit] - 1] = calculators[i];
+                count[digit]--;
+            }
+
+            return output.ToList();
+        }
 
     }
 }
